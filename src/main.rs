@@ -1,33 +1,24 @@
 use self::TermKind::*;
-use typed_arena::Arena;
 
 macro_rules! T {
-    ($kind:expr, $arena:expr) => {
-        $arena.alloc(Term::new($kind))
+    ($kind:expr) => {
+        Box::new(Term::new($kind))
     };
 }
 
 fn main() {
-    let arena = &Arena::new();
-    let term = T![
-        If(
-            T![True, arena],
-            T![Pred(T![Zero, arena]), arena],
-            T![True, arena]
-        ),
-        arena
-    ];
-    println!("{:?}", term.clone().eval(arena).unwrap_or(term));
+    let term = T![If(T![True], T![Pred(T![Zero])], T![True])];
+    println!("{:?}", term.clone().eval().unwrap_or(term));
 }
 
 #[derive(Debug, Clone)]
-pub struct Term<'a> {
-    kind: TermKind<'a>,
+pub struct Term {
+    kind: TermKind,
     info: Info,
 }
 
-impl<'a> Term<'a> {
-    pub fn new(kind: TermKind<'a>) -> Self {
+impl Term {
+    pub fn new(kind: TermKind) -> Self {
         Self {
             kind,
             info: DUMMY_INFO,
@@ -36,14 +27,14 @@ impl<'a> Term<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub enum TermKind<'a> {
+pub enum TermKind {
     True,
     False,
     Zero,
-    If(&'a Term<'a>, &'a Term<'a>, &'a Term<'a>),
-    Succ(&'a Term<'a>),
-    Pred(&'a Term<'a>),
-    IsZero(&'a Term<'a>),
+    If(Box<Term>, Box<Term>, Box<Term>),
+    Succ(Box<Term>),
+    Pred(Box<Term>),
+    IsZero(Box<Term>),
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -54,7 +45,7 @@ pub struct Info {
 
 const DUMMY_INFO: Info = Info { lo: 0, hi: 0 };
 
-impl<'a> Term<'a> {
+impl Term {
     pub fn is_numeric(&self) -> bool {
         match &self.kind {
             Zero => true,
@@ -71,33 +62,33 @@ impl<'a> Term<'a> {
         }
     }
 
-    pub fn eval<'t>(&'t self, arena: &'t Arena<Term<'t>>) -> Option<&'t Term<'t>> {
-        let t = match &self.kind {
+    pub fn eval(self) -> Option<Box<Term>> {
+        let t = match self.kind {
             If(cond, t2, t3) => match &cond.kind {
-                True => *t2,
-                False => *t3,
-                _ => arena.alloc(Term {
-                    kind: If(cond.eval(arena)?, t2, t3),
+                True => t2,
+                False => t3,
+                _ => Box::new(Term {
+                    kind: If(cond.eval()?, t2, t3),
                     info: self.info,
                 }),
             },
-            Succ(t) => arena.alloc(Term {
-                kind: Succ(t.eval(arena)?),
+            Succ(t) => Box::new(Term {
+                kind: Succ(t.eval()?),
                 info: self.info,
             }),
             Pred(t) => match t.kind {
-                Zero => T![Zero, arena],
+                Zero => T![Zero],
                 Succ(t) if t.is_numeric() => t,
-                _ => arena.alloc(Term {
-                    kind: Pred(t.eval(arena)?),
+                _ => Box::new(Term {
+                    kind: Pred(t.eval()?),
                     info: self.info,
                 }),
             },
             IsZero(t) => match t.kind {
-                Zero => T![True, arena],
-                Succ(t) if t.is_numeric() => T![False, arena],
-                _ => arena.alloc(Term {
-                    kind: IsZero(t.eval(arena)?),
+                Zero => T![True],
+                Succ(t) if t.is_numeric() => T![False],
+                _ => Box::new(Term {
+                    kind: IsZero(t.eval()?),
                     info: self.info,
                 }),
             },
@@ -106,28 +97,28 @@ impl<'a> Term<'a> {
         Some(t)
     }
 
-    pub fn eval2<'t>(&'t self, arena: &'t Arena<Term<'t>>) -> Option<&'t Term<'t>> {
-        let t = match &self.kind {
-            If(cond, t2, t3) => match cond.eval2(arena)?.kind {
-                True => *t2,
+    pub fn eval2(self) -> Option<Box<Term>> {
+        let t = match self.kind {
+            If(cond, t2, t3) => match cond.eval2()?.kind {
+                True => t2,
                 False => t3,
                 _ => return None,
             },
-            Succ(t) => arena.alloc(Term {
-                kind: Succ(t.eval2(arena)?),
+            Succ(t) => Box::new(Term {
+                kind: Succ(t.eval2()?),
                 info: self.info,
             }),
-            Pred(t) => match t.eval2(arena)?.kind {
-                Zero => T![Zero, arena],
+            Pred(t) => match t.eval2()?.kind {
+                Zero => T![Zero],
                 Succ(t) if t.is_numeric() => t,
                 _ => return None,
             },
-            IsZero(t) => match t.eval2(arena)?.kind {
-                Zero => T![True, arena],
-                Succ(t) if t.is_numeric() => T![False, arena],
+            IsZero(t) => match t.eval2()?.kind {
+                Zero => T![True],
+                Succ(t) if t.is_numeric() => T![False],
                 _ => return None,
             },
-            _ => return Some(self),
+            _ => return Some(Box::new(self)),
         };
         Some(t)
     }
