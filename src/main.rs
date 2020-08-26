@@ -8,7 +8,7 @@ macro_rules! T {
 
 fn main() {
     let term = T![If(T![True], T![Pred(T![Zero])], T![True])];
-    println!("{:?}", term.clone().eval().unwrap_or(term));
+    println!("{:?}", term.eval().unwrap_or_else(|orig| orig));
 }
 
 #[derive(Debug, Clone)]
@@ -62,7 +62,7 @@ impl Term {
         }
     }
 
-    pub fn eval(self) -> Option<Box<Term>> {
+    pub fn eval(self: Box<Self>) -> Result<Box<Term>, Box<Term>> {
         let t = match self.kind {
             If(cond, t2, t3) => match &cond.kind {
                 True => t2,
@@ -92,34 +92,8 @@ impl Term {
                     info: self.info,
                 }),
             },
-            _ => return None,
+            _ => return Err(self),
         };
-        Some(t)
-    }
-
-    pub fn eval2(self) -> Option<Box<Term>> {
-        let t = match self.kind {
-            If(cond, t2, t3) => match cond.eval2()?.kind {
-                True => t2,
-                False => t3,
-                _ => return None,
-            },
-            Succ(t) => Box::new(Term {
-                kind: Succ(t.eval2()?),
-                info: self.info,
-            }),
-            Pred(t) => match t.eval2()?.kind {
-                Zero => T![Zero],
-                Succ(t) if t.is_numeric() => t,
-                _ => return None,
-            },
-            IsZero(t) => match t.eval2()?.kind {
-                Zero => T![True],
-                Succ(t) if t.is_numeric() => T![False],
-                _ => return None,
-            },
-            _ => return Some(Box::new(self)),
-        };
-        Some(t)
+        Ok(t)
     }
 }
