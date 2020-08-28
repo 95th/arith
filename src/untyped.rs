@@ -27,13 +27,53 @@ impl Term {
         Self { kind, info }
     }
 
-    pub fn subst_top(self: &Rc<Self>, subst_term: Rc<Self>) -> Rc<Term> {
+    pub fn is_val(&self, _ctx: &Context) -> bool {
+        match &self.kind {
+            Abstraction { .. } => true,
+            _ => false,
+        }
+    }
+
+    pub fn eval(self: &Rc<Self>, ctx: &mut Context) -> Rc<Self> {
+        self.eval_1(ctx).unwrap_or_else(|| self.clone())
+    }
+
+    fn eval_1(self: &Rc<Self>, ctx: &mut Context) -> Option<Rc<Self>> {
+        match &self.kind {
+            Application { target, val } => match &target.kind {
+                Abstraction { term, .. } if val.is_val(ctx) => Some(val.subst_top(term.clone())),
+                _ if target.is_val(ctx) => {
+                    let val = val.eval_1(ctx)?;
+                    Some(Rc::new(Term {
+                        kind: Application {
+                            target: target.clone(),
+                            val,
+                        },
+                        info: self.info,
+                    }))
+                }
+                _ => {
+                    let target = target.eval_1(ctx)?;
+                    Some(Rc::new(Term {
+                        kind: Application {
+                            target,
+                            val: val.clone(),
+                        },
+                        info: self.info,
+                    }))
+                }
+            },
+            _ => None,
+        }
+    }
+
+    pub fn subst_top(self: &Rc<Self>, subst_term: Rc<Self>) -> Rc<Self> {
         let subst_term = subst_term.shift(1);
         let term = self.subst(0, subst_term);
         term.shift(-1)
     }
 
-    pub fn subst(self: &Rc<Self>, term_idx: u32, subst_term: Rc<Self>) -> Rc<Term> {
+    pub fn subst(self: &Rc<Self>, term_idx: u32, subst_term: Rc<Self>) -> Rc<Self> {
         self.map(0, &|info, ctx, idx, len| {
             if idx == term_idx + ctx {
                 subst_term.clone().shift(ctx as i32)
@@ -46,7 +86,7 @@ impl Term {
         })
     }
 
-    pub fn shift_above(self: &Rc<Self>, ctx: u32, dist: i32) -> Rc<Term> {
+    pub fn shift_above(self: &Rc<Self>, ctx: u32, dist: i32) -> Rc<Self> {
         self.map(ctx, &|info, ctx, idx, len| {
             let kind = Variable {
                 idx: if idx >= ctx {
@@ -60,11 +100,11 @@ impl Term {
         })
     }
 
-    pub fn shift(self: &Rc<Self>, dist: i32) -> Rc<Term> {
+    pub fn shift(self: &Rc<Self>, dist: i32) -> Rc<Self> {
         self.shift_above(0, dist)
     }
 
-    fn map<F>(self: &Rc<Self>, ctx: u32, map_fn: &F) -> Rc<Term>
+    fn map<F>(self: &Rc<Self>, ctx: u32, map_fn: &F) -> Rc<Self>
     where
         F: Fn(Info, u32, u32, u32) -> Rc<Term>,
     {
