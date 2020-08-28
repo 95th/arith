@@ -24,29 +24,30 @@ impl Term {
         Self { kind, info }
     }
 
+    // pub fn subst_top(&self, subst_term: &Term) -> Box<Term> {
+    //     self.subst(0, &subst_term.shift(1)).shift(todo!())
+    // }
+
     pub fn subst(&self, term_idx: u32, subst_term: &Term) -> Box<Term> {
-        self.map(0, &|term, ctx, idx, len| {
+        self.map(0, &|info, ctx, idx, len| {
             if idx == term_idx + ctx {
                 subst_term.shift(ctx)
             } else {
                 Box::new(Term {
                     kind: Variable { idx, len },
-                    info: term.info,
+                    info,
                 })
             }
         })
     }
 
     pub fn shift_above(&self, ctx: u32, dist: u32) -> Box<Term> {
-        self.map(ctx, &|term, ctx, idx, len| {
+        self.map(ctx, &|info, ctx, idx, len| {
             let kind = Variable {
                 idx: if idx >= ctx { idx + dist } else { idx },
                 len: len + dist,
             };
-            Box::new(Term {
-                kind,
-                info: term.info,
-            })
+            Box::new(Term { kind, info })
         })
     }
 
@@ -56,14 +57,14 @@ impl Term {
 
     fn map<F>(&self, ctx: u32, map_fn: &F) -> Box<Term>
     where
-        F: Fn(&Term, u32, u32, u32) -> Box<Term>,
+        F: Fn(Info, u32, u32, u32) -> Box<Term>,
     {
         fn walk<F>(term: &Term, ctx: u32, map_fn: &F) -> Box<Term>
         where
-            F: Fn(&Term, u32, u32, u32) -> Box<Term>,
+            F: Fn(Info, u32, u32, u32) -> Box<Term>,
         {
             let kind = match &term.kind {
-                Variable { idx, len } => return map_fn(term, ctx, *idx, *len),
+                Variable { idx, len } => return map_fn(term.info, ctx, *idx, *len),
                 Abstraction { name, term } => Abstraction {
                     name: name.clone(),
                     term: walk(term, ctx + 1, map_fn),
