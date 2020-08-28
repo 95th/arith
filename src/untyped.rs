@@ -9,7 +9,6 @@ macro_rules! U {
     };
 }
 
-#[derive(Clone)]
 pub struct Term {
     kind: TermKind,
     info: Info,
