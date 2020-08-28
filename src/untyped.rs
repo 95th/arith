@@ -2,6 +2,13 @@ use crate::info::Info;
 use std::rc::Rc;
 use TermKind::*;
 
+#[macro_export]
+macro_rules! U {
+    ($kind:expr) => {
+        std::rc::Rc::new($crate::untyped::Term::new($kind))
+    };
+}
+
 #[derive(Clone)]
 pub struct Term {
     kind: TermKind,
@@ -141,7 +148,7 @@ impl Term {
                 buf.push_str(&x1);
                 buf.push_str(". ");
                 term.print(ctx, buf);
-                buf.push_str(" )");
+                buf.push(')');
             }
             Application { target, val } => {
                 buf.push('(');
