@@ -9,12 +9,13 @@ macro_rules! U {
     };
 }
 
+#[derive(Debug)]
 pub struct Term {
     kind: TermKind,
     info: Info,
 }
 
-#[derive(Clone)]
+#[derive(Debug)]
 pub enum TermKind {
     Variable { idx: u32, len: u32 },
     Abstraction { name: String, term: Rc<Term> },
