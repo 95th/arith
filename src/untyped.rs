@@ -1,15 +1,18 @@
 use crate::info::Info;
+use std::rc::Rc;
 use TermKind::*;
 
+#[derive(Clone)]
 pub struct Term {
     kind: TermKind,
     info: Info,
 }
 
+#[derive(Clone)]
 pub enum TermKind {
     Variable { idx: u32, len: u32 },
-    Abstraction { name: String, term: Box<Term> },
-    Application { target: Box<Term>, val: Box<Term> },
+    Abstraction { name: String, term: Rc<Term> },
+    Application { target: Rc<Term>, val: Rc<Term> },
 }
 
 impl Term {
@@ -24,16 +27,18 @@ impl Term {
         Self { kind, info }
     }
 
-    // pub fn subst_top(&self, subst_term: &Term) -> Box<Term> {
-    //     self.subst(0, &subst_term.shift(1)).shift(todo!())
-    // }
+    pub fn subst_top(self: &Rc<Self>, subst_term: Rc<Self>) -> Rc<Term> {
+        let subst_term = subst_term.shift(1);
+        let term = self.subst(0, subst_term);
+        term.shift(-1)
+    }
 
-    pub fn subst(&self, term_idx: u32, subst_term: &Term) -> Box<Term> {
+    pub fn subst(self: &Rc<Self>, term_idx: u32, subst_term: Rc<Self>) -> Rc<Term> {
         self.map(0, &|info, ctx, idx, len| {
             if idx == term_idx + ctx {
-                subst_term.shift(ctx)
+                subst_term.clone().shift(ctx as i32)
             } else {
-                Box::new(Term {
+                Rc::new(Term {
                     kind: Variable { idx, len },
                     info,
                 })
@@ -41,27 +46,31 @@ impl Term {
         })
     }
 
-    pub fn shift_above(&self, ctx: u32, dist: u32) -> Box<Term> {
+    pub fn shift_above(self: &Rc<Self>, ctx: u32, dist: i32) -> Rc<Term> {
         self.map(ctx, &|info, ctx, idx, len| {
             let kind = Variable {
-                idx: if idx >= ctx { idx + dist } else { idx },
-                len: len + dist,
+                idx: if idx >= ctx {
+                    ((idx as i32) + dist) as u32
+                } else {
+                    idx
+                },
+                len: ((len as i32) + dist) as u32,
             };
-            Box::new(Term { kind, info })
+            Rc::new(Term { kind, info })
         })
     }
 
-    pub fn shift(&self, dist: u32) -> Box<Term> {
+    pub fn shift(self: &Rc<Self>, dist: i32) -> Rc<Term> {
         self.shift_above(0, dist)
     }
 
-    fn map<F>(&self, ctx: u32, map_fn: &F) -> Box<Term>
+    fn map<F>(self: &Rc<Self>, ctx: u32, map_fn: &F) -> Rc<Term>
     where
-        F: Fn(Info, u32, u32, u32) -> Box<Term>,
+        F: Fn(Info, u32, u32, u32) -> Rc<Term>,
     {
-        fn walk<F>(term: &Term, ctx: u32, map_fn: &F) -> Box<Term>
+        fn walk<F>(term: &Rc<Term>, ctx: u32, map_fn: &F) -> Rc<Term>
         where
-            F: Fn(Info, u32, u32, u32) -> Box<Term>,
+            F: Fn(Info, u32, u32, u32) -> Rc<Term>,
         {
             let kind = match &term.kind {
                 Variable { idx, len } => return map_fn(term.info, ctx, *idx, *len),
@@ -74,7 +83,8 @@ impl Term {
                     val: walk(val, ctx, map_fn),
                 },
             };
-            Box::new(Term {
+
+            Rc::new(Term {
                 kind,
                 info: term.info,
             })
