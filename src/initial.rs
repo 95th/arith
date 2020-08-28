@@ -1,10 +1,11 @@
 use self::TermKind::*;
 use crate::info::Info;
+use std::rc::Rc;
 
 #[macro_export]
 macro_rules! T {
     ($kind:expr) => {
-        Box::new($crate::initial::Term::new($kind))
+        Rc::new($crate::initial::Term::new($kind))
     };
 }
 
@@ -28,10 +29,10 @@ pub enum TermKind {
     True,
     False,
     Zero,
-    If(Box<Term>, Box<Term>, Box<Term>),
-    Succ(Box<Term>),
-    Pred(Box<Term>),
-    IsZero(Box<Term>),
+    If(Rc<Term>, Rc<Term>, Rc<Term>),
+    Succ(Rc<Term>),
+    Pred(Rc<Term>),
+    IsZero(Rc<Term>),
 }
 
 impl Term {
@@ -51,38 +52,42 @@ impl Term {
         }
     }
 
-    pub fn eval(self: Box<Self>) -> Result<Box<Term>, Box<Term>> {
-        let t = match self.kind {
+    pub fn eval(self: &Rc<Self>) -> Rc<Self> {
+        self.eval_1().unwrap_or_else(|| self.clone())
+    }
+
+    fn eval_1(self: &Rc<Self>) -> Option<Rc<Self>> {
+        let t = match &self.kind {
             If(cond, t2, t3) => match &cond.kind {
-                True => t2,
-                False => t3,
-                _ => Box::new(Term {
-                    kind: If(cond.eval()?, t2, t3),
+                True => t2.clone(),
+                False => t3.clone(),
+                _ => Rc::new(Term {
+                    kind: If(cond.eval_1()?, t2.clone(), t3.clone()),
                     info: self.info,
                 }),
             },
-            Succ(t) => Box::new(Term {
-                kind: Succ(t.eval()?),
+            Succ(t) => Rc::new(Term {
+                kind: Succ(t.eval_1()?),
                 info: self.info,
             }),
-            Pred(t) => match t.kind {
+            Pred(t) => match &t.kind {
                 Zero => T![Zero],
-                Succ(t) if t.is_numeric() => t,
-                _ => Box::new(Term {
-                    kind: Pred(t.eval()?),
+                Succ(t) if t.is_numeric() => t.clone(),
+                _ => Rc::new(Term {
+                    kind: Pred(t.eval_1()?),
                     info: self.info,
                 }),
             },
-            IsZero(t) => match t.kind {
+            IsZero(t) => match &t.kind {
                 Zero => T![True],
                 Succ(t) if t.is_numeric() => T![False],
-                _ => Box::new(Term {
-                    kind: IsZero(t.eval()?),
+                _ => Rc::new(Term {
+                    kind: IsZero(t.eval_1()?),
                     info: self.info,
                 }),
             },
-            _ => return Err(self),
+            _ => return None,
         };
-        Ok(t)
+        Some(t)
     }
 }
