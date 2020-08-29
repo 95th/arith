@@ -28,14 +28,14 @@ pub enum TermKind {
         idx: u32,
         len: u32,
     },
-    Abs {
+    Fun {
         name: String,
         ty: Rc<Ty>,
         term: Rc<Term>,
     },
-    App {
-        target: Rc<Term>,
-        val: Rc<Term>,
+    Call {
+        callee: Rc<Term>,
+        arg: Rc<Term>,
     },
 }
 
@@ -53,7 +53,7 @@ impl Term {
 
     pub fn is_val(&self, _ctx: &Context) -> bool {
         match &self.kind {
-            Abs { .. } => true,
+            Fun { .. } => true,
             _ => false,
         }
     }
@@ -80,24 +80,24 @@ impl Term {
                     info: self.info,
                 })),
             },
-            App { target, val } => match &target.kind {
-                Abs { term, .. } if val.is_val(ctx) => Some(val.subst_top(term.clone())),
-                _ if target.is_val(ctx) => {
-                    let val = val.eval_1(ctx)?;
+            Call { callee, arg } => match &callee.kind {
+                Fun { term, .. } if arg.is_val(ctx) => Some(arg.subst_top(term.clone())),
+                _ if callee.is_val(ctx) => {
+                    let arg = arg.eval_1(ctx)?;
                     Some(Rc::new(Term {
-                        kind: App {
-                            target: target.clone(),
-                            val,
+                        kind: Call {
+                            callee: callee.clone(),
+                            arg,
                         },
                         info: self.info,
                     }))
                 }
                 _ => {
-                    let target = target.eval_1(ctx)?;
+                    let callee = callee.eval_1(ctx)?;
                     Some(Rc::new(Term {
-                        kind: App {
-                            target,
-                            val: val.clone(),
+                        kind: Call {
+                            callee,
+                            arg: arg.clone(),
                         },
                         info: self.info,
                     }))
@@ -164,14 +164,14 @@ impl Term {
                     else_branch: walk(else_branch, ctx, map_fn),
                 },
                 Var { idx, len } => return map_fn(term.info, ctx, *idx, *len),
-                Abs { name, ty, term } => Abs {
+                Fun { name, ty, term } => Fun {
                     name: name.clone(),
                     ty: ty.clone(),
                     term: walk(term, ctx + 1, map_fn),
                 },
-                App { target, val } => App {
-                    target: walk(target, ctx, map_fn),
-                    val: walk(val, ctx, map_fn),
+                Call { callee, arg } => Call {
+                    callee: walk(callee, ctx, map_fn),
+                    arg: walk(arg, ctx, map_fn),
                 },
             };
 
@@ -201,7 +201,7 @@ impl Term {
                 else_branch.print(ctx, buf);
                 buf.push_str(" }");
             }
-            Abs { name, term, .. } => {
+            Fun { name, term, .. } => {
                 let x1 = ctx.pick_fresh_name(name);
                 buf.push_str("(lambda ");
                 buf.push_str(&x1);
@@ -209,11 +209,11 @@ impl Term {
                 term.print(ctx, buf);
                 buf.push(')');
             }
-            App { target, val } => {
+            Call { callee, arg } => {
                 buf.push('(');
-                target.print(ctx, buf);
+                callee.print(ctx, buf);
                 buf.push(' ');
-                val.print(ctx, buf);
+                arg.print(ctx, buf);
                 buf.push(')');
             }
             Var { idx, len } => {
@@ -247,7 +247,7 @@ impl Term {
                 }
             }
             Var { idx, .. } => ctx.get_ty(*idx as usize),
-            Abs { name, ty, term } => {
+            Fun { name, ty, term } => {
                 let ctx = ctx.add_binding(name, Binding::Variable(ty.clone()));
                 let to = term.type_of(&ctx);
                 Rc::new(Ty::Arrow {
@@ -255,12 +255,12 @@ impl Term {
                     to,
                 })
             }
-            App { target, val } => {
-                let ty_target = target.type_of(ctx);
-                let ty_val = val.type_of(ctx);
-                match &*ty_target {
+            Call { callee, arg } => {
+                let ty_callee = callee.type_of(ctx);
+                let ty_arg = arg.type_of(ctx);
+                match &*ty_callee {
                     Ty::Arrow { from, to } => {
-                        if from == &ty_val {
+                        if from == &ty_arg {
                             return to.clone();
                         } else {
                             panic!("Parameter type mismatch");

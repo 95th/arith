@@ -5,16 +5,16 @@ use arith::{
 use std::rc::Rc;
 
 fn main() {
-    let t = U![Abs {
+    let t = U![Fun {
         name: String::from("a"),
         ty: Rc::new(Ty::Bool),
-        term: U![App {
-            target: U![Abs {
+        term: U![Call {
+            callee: U![Fun {
                 name: String::from("b"),
                 ty: Rc::new(Ty::Bool),
                 term: U![Var { idx: 1, len: 2 }],
             }],
-            val: U![Var { idx: 0, len: 2 }],
+            arg: U![Var { idx: 0, len: 2 }],
         }]
     }];
 
