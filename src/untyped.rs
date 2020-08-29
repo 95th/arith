@@ -1,4 +1,4 @@
-use crate::info::Info;
+use crate::span::Span;
 use std::rc::Rc;
 use TermKind::*;
 
@@ -12,7 +12,7 @@ macro_rules! U {
 #[derive(Debug)]
 pub struct Term {
     kind: TermKind,
-    info: Info,
+    span: Span,
 }
 
 #[derive(Debug)]
@@ -43,12 +43,12 @@ impl Term {
     pub fn new(kind: TermKind) -> Self {
         Self {
             kind,
-            info: Info::DUMMY,
+            span: Span::DUMMY,
         }
     }
 
-    pub fn with_info(kind: TermKind, info: Info) -> Self {
-        Self { kind, info }
+    pub fn with_span(kind: TermKind, span: Span) -> Self {
+        Self { kind, span }
     }
 
     pub fn is_val(&self, _ctx: &Context) -> bool {
@@ -77,7 +77,7 @@ impl Term {
                         then_branch: then_branch.clone(),
                         else_branch: else_branch.clone(),
                     },
-                    info: self.info,
+                    span: self.span,
                 })),
             },
             Call { callee, arg } => match &callee.kind {
@@ -89,7 +89,7 @@ impl Term {
                             callee: callee.clone(),
                             arg,
                         },
-                        info: self.info,
+                        span: self.span,
                     }))
                 }
                 _ => {
@@ -99,7 +99,7 @@ impl Term {
                             callee,
                             arg: arg.clone(),
                         },
-                        info: self.info,
+                        span: self.span,
                     }))
                 }
             },
@@ -114,20 +114,20 @@ impl Term {
     }
 
     pub fn subst(self: &Rc<Self>, term_idx: u32, subst_term: Rc<Self>) -> Rc<Self> {
-        self.map(0, &|info, ctx, idx, len| {
+        self.map(0, &|span, ctx, idx, len| {
             if idx == term_idx + ctx {
                 subst_term.shift(ctx as i32)
             } else {
                 Rc::new(Term {
                     kind: Var { idx, len },
-                    info,
+                    span,
                 })
             }
         })
     }
 
     pub fn shift_above(self: &Rc<Self>, ctx: u32, dist: i32) -> Rc<Self> {
-        self.map(ctx, &|info, ctx, idx, len| {
+        self.map(ctx, &|span, ctx, idx, len| {
             let kind = Var {
                 idx: if idx >= ctx {
                     ((idx as i32) + dist) as u32
@@ -136,7 +136,7 @@ impl Term {
                 },
                 len: ((len as i32) + dist) as u32,
             };
-            Rc::new(Term { kind, info })
+            Rc::new(Term { kind, span })
         })
     }
 
@@ -146,11 +146,11 @@ impl Term {
 
     fn map<F>(self: &Rc<Self>, ctx: u32, map_fn: &F) -> Rc<Self>
     where
-        F: Fn(Info, u32, u32, u32) -> Rc<Term>,
+        F: Fn(Span, u32, u32, u32) -> Rc<Term>,
     {
         fn walk<F>(term: &Rc<Term>, ctx: u32, map_fn: &F) -> Rc<Term>
         where
-            F: Fn(Info, u32, u32, u32) -> Rc<Term>,
+            F: Fn(Span, u32, u32, u32) -> Rc<Term>,
         {
             let kind = match &term.kind {
                 True | False => return term.clone(),
@@ -163,7 +163,7 @@ impl Term {
                     then_branch: walk(then_branch, ctx, map_fn),
                     else_branch: walk(else_branch, ctx, map_fn),
                 },
-                Var { idx, len } => return map_fn(term.info, ctx, *idx, *len),
+                Var { idx, len } => return map_fn(term.span, ctx, *idx, *len),
                 Fun { name, ty, term } => Fun {
                     name: name.clone(),
                     ty: ty.clone(),
@@ -177,7 +177,7 @@ impl Term {
 
             Rc::new(Term {
                 kind,
-                info: term.info,
+                span: term.span,
             })
         }
 

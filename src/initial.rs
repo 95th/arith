@@ -1,5 +1,5 @@
 use self::TermKind::*;
-use crate::info::Info;
+use crate::span::Span;
 use std::rc::Rc;
 
 #[macro_export]
@@ -12,14 +12,14 @@ macro_rules! T {
 #[derive(Debug, Clone)]
 pub struct Term {
     kind: TermKind,
-    info: Info,
+    span: Span,
 }
 
 impl Term {
     pub fn new(kind: TermKind) -> Self {
         Self {
             kind,
-            info: Info::DUMMY,
+            span: Span::DUMMY,
         }
     }
 }
@@ -63,19 +63,19 @@ impl Term {
                 False => t3.clone(),
                 _ => Rc::new(Term {
                     kind: If(cond.eval_1()?, t2.clone(), t3.clone()),
-                    info: self.info,
+                    span: self.span,
                 }),
             },
             Succ(t) => Rc::new(Term {
                 kind: Succ(t.eval_1()?),
-                info: self.info,
+                span: self.span,
             }),
             Pred(t) => match &t.kind {
                 Zero => T![Zero],
                 Succ(t) if t.is_numeric() => t.clone(),
                 _ => Rc::new(Term {
                     kind: Pred(t.eval_1()?),
-                    info: self.info,
+                    span: self.span,
                 }),
             },
             IsZero(t) => match &t.kind {
@@ -83,7 +83,7 @@ impl Term {
                 Succ(t) if t.is_numeric() => T![False],
                 _ => Rc::new(Term {
                     kind: IsZero(t.eval_1()?),
-                    info: self.info,
+                    span: self.span,
                 }),
             },
             _ => return None,
