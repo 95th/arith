@@ -17,9 +17,26 @@ pub struct Term {
 
 #[derive(Debug)]
 pub enum TermKind {
-    Var { idx: u32, len: u32 },
-    Abs { name: String, term: Rc<Term> },
-    App { target: Rc<Term>, val: Rc<Term> },
+    True,
+    False,
+    If {
+        cond: Rc<Term>,
+        then_branch: Rc<Term>,
+        else_branch: Rc<Term>,
+    },
+    Var {
+        idx: u32,
+        len: u32,
+    },
+    Abs {
+        name: String,
+        ty: Rc<Ty>,
+        term: Rc<Term>,
+    },
+    App {
+        target: Rc<Term>,
+        val: Rc<Term>,
+    },
 }
 
 impl Term {
@@ -47,6 +64,22 @@ impl Term {
 
     fn eval_1(self: &Rc<Self>, ctx: &mut Context) -> Option<Rc<Self>> {
         match &self.kind {
+            If {
+                cond,
+                then_branch,
+                else_branch,
+            } => match &cond.kind {
+                True => Some(then_branch.clone()),
+                False => Some(else_branch.clone()),
+                _ => Some(Rc::new(Term {
+                    kind: If {
+                        cond: cond.eval_1(ctx)?,
+                        then_branch: then_branch.clone(),
+                        else_branch: else_branch.clone(),
+                    },
+                    info: self.info,
+                })),
+            },
             App { target, val } => match &target.kind {
                 Abs { term, .. } if val.is_val(ctx) => Some(val.subst_top(term.clone())),
                 _ if target.is_val(ctx) => {
@@ -83,7 +116,7 @@ impl Term {
     pub fn subst(self: &Rc<Self>, term_idx: u32, subst_term: Rc<Self>) -> Rc<Self> {
         self.map(0, &|info, ctx, idx, len| {
             if idx == term_idx + ctx {
-                subst_term.clone().shift(ctx as i32)
+                subst_term.shift(ctx as i32)
             } else {
                 Rc::new(Term {
                     kind: Var { idx, len },
@@ -120,9 +153,20 @@ impl Term {
             F: Fn(Info, u32, u32, u32) -> Rc<Term>,
         {
             let kind = match &term.kind {
+                True | False => return term.clone(),
+                If {
+                    cond,
+                    then_branch,
+                    else_branch,
+                } => If {
+                    cond: walk(cond, ctx, map_fn),
+                    then_branch: walk(then_branch, ctx, map_fn),
+                    else_branch: walk(else_branch, ctx, map_fn),
+                },
                 Var { idx, len } => return map_fn(term.info, ctx, *idx, *len),
-                Abs { name, term } => Abs {
+                Abs { name, ty, term } => Abs {
                     name: name.clone(),
+                    ty: ty.clone(),
                     term: walk(term, ctx + 1, map_fn),
                 },
                 App { target, val } => App {
@@ -142,7 +186,22 @@ impl Term {
 
     pub fn print(&self, ctx: &mut Context, buf: &mut String) {
         match &self.kind {
-            Abs { name, term } => {
+            True => buf.push_str("true"),
+            False => buf.push_str("false"),
+            If {
+                cond,
+                then_branch,
+                else_branch,
+            } => {
+                buf.push_str("if ");
+                cond.print(ctx, buf);
+                buf.push_str(" { ");
+                then_branch.print(ctx, buf);
+                buf.push_str(" } else { ");
+                else_branch.print(ctx, buf);
+                buf.push_str(" }");
+            }
+            Abs { name, term, .. } => {
                 let x1 = ctx.pick_fresh_name(name);
                 buf.push_str("(lambda ");
                 buf.push_str(&x1);
@@ -162,6 +221,52 @@ impl Term {
                     buf.push_str(ctx.index_to_name(*idx as usize));
                 } else {
                     buf.push_str("[bad index]");
+                }
+            }
+        }
+    }
+
+    pub fn type_of(&self, ctx: &Context) -> Rc<Ty> {
+        match &self.kind {
+            True | False => Rc::new(Ty::Bool),
+            If {
+                cond,
+                then_branch,
+                else_branch,
+            } => {
+                if cond.type_of(ctx) == Rc::new(Ty::Bool) {
+                    let ty1 = then_branch.type_of(ctx);
+                    let ty2 = else_branch.type_of(ctx);
+                    if ty1 == ty2 {
+                        return ty1;
+                    } else {
+                        panic!("Arms of Conditionals have different types");
+                    }
+                } else {
+                    panic!("Guard of conditional must be a boolean");
+                }
+            }
+            Var { idx, .. } => ctx.get_ty(*idx as usize),
+            Abs { name, ty, term } => {
+                let ctx = ctx.add_binding(name, Binding::Variable(ty.clone()));
+                let to = term.type_of(&ctx);
+                Rc::new(Ty::Arrow {
+                    from: ty.clone(),
+                    to,
+                })
+            }
+            App { target, val } => {
+                let ty_target = target.type_of(ctx);
+                let ty_val = val.type_of(ctx);
+                match &*ty_target {
+                    Ty::Arrow { from, to } => {
+                        if from == &ty_val {
+                            return to.clone();
+                        } else {
+                            panic!("Parameter type mismatch");
+                        }
+                    }
+                    _ => panic!("Arrow type expected"),
                 }
             }
         }
@@ -188,7 +293,7 @@ impl Context {
             name.push('\'');
             self.pick_fresh_name(&name)
         } else {
-            self.list.push((name.clone(), Binding::NameBind));
+            self.list.push((name.clone(), Binding::Name));
             name
         }
     }
@@ -196,8 +301,36 @@ impl Context {
     pub fn is_name_bound(&self, name: &str) -> bool {
         self.list.iter().any(|(n, _)| n == name)
     }
+
+    pub fn add_binding(&self, name: &str, binding: Binding) -> Self {
+        let mut list = self.list.clone();
+        list.push((name.to_owned(), binding));
+        Self { list }
+    }
+
+    pub fn get_ty(&self, index: usize) -> Rc<Ty> {
+        match self.get_binding(index) {
+            Binding::Variable(ty) => ty.clone(),
+            _ => panic!(
+                "Wrong kind of binding for variable: {}",
+                self.index_to_name(index)
+            ),
+        }
+    }
+
+    pub fn get_binding(&self, index: usize) -> &Binding {
+        &self.list[index].1
+    }
 }
 
+#[derive(Debug, Clone)]
 pub enum Binding {
-    NameBind,
+    Name,
+    Variable(Rc<Ty>),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Ty {
+    Bool,
+    Arrow { from: Rc<Ty>, to: Rc<Ty> },
 }
