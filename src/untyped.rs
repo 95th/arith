@@ -17,9 +17,9 @@ pub struct Term {
 
 #[derive(Debug)]
 pub enum TermKind {
-    Variable { idx: u32, len: u32 },
-    Abstraction { name: String, term: Rc<Term> },
-    Application { target: Rc<Term>, val: Rc<Term> },
+    Var { idx: u32, len: u32 },
+    Abs { name: String, term: Rc<Term> },
+    App { target: Rc<Term>, val: Rc<Term> },
 }
 
 impl Term {
@@ -36,7 +36,7 @@ impl Term {
 
     pub fn is_val(&self, _ctx: &Context) -> bool {
         match &self.kind {
-            Abstraction { .. } => true,
+            Abs { .. } => true,
             _ => false,
         }
     }
@@ -47,12 +47,12 @@ impl Term {
 
     fn eval_1(self: &Rc<Self>, ctx: &mut Context) -> Option<Rc<Self>> {
         match &self.kind {
-            Application { target, val } => match &target.kind {
-                Abstraction { term, .. } if val.is_val(ctx) => Some(val.subst_top(term.clone())),
+            App { target, val } => match &target.kind {
+                Abs { term, .. } if val.is_val(ctx) => Some(val.subst_top(term.clone())),
                 _ if target.is_val(ctx) => {
                     let val = val.eval_1(ctx)?;
                     Some(Rc::new(Term {
-                        kind: Application {
+                        kind: App {
                             target: target.clone(),
                             val,
                         },
@@ -62,7 +62,7 @@ impl Term {
                 _ => {
                     let target = target.eval_1(ctx)?;
                     Some(Rc::new(Term {
-                        kind: Application {
+                        kind: App {
                             target,
                             val: val.clone(),
                         },
@@ -86,7 +86,7 @@ impl Term {
                 subst_term.clone().shift(ctx as i32)
             } else {
                 Rc::new(Term {
-                    kind: Variable { idx, len },
+                    kind: Var { idx, len },
                     info,
                 })
             }
@@ -95,7 +95,7 @@ impl Term {
 
     pub fn shift_above(self: &Rc<Self>, ctx: u32, dist: i32) -> Rc<Self> {
         self.map(ctx, &|info, ctx, idx, len| {
-            let kind = Variable {
+            let kind = Var {
                 idx: if idx >= ctx {
                     ((idx as i32) + dist) as u32
                 } else {
@@ -120,12 +120,12 @@ impl Term {
             F: Fn(Info, u32, u32, u32) -> Rc<Term>,
         {
             let kind = match &term.kind {
-                Variable { idx, len } => return map_fn(term.info, ctx, *idx, *len),
-                Abstraction { name, term } => Abstraction {
+                Var { idx, len } => return map_fn(term.info, ctx, *idx, *len),
+                Abs { name, term } => Abs {
                     name: name.clone(),
                     term: walk(term, ctx + 1, map_fn),
                 },
-                Application { target, val } => Application {
+                App { target, val } => App {
                     target: walk(target, ctx, map_fn),
                     val: walk(val, ctx, map_fn),
                 },
@@ -142,7 +142,7 @@ impl Term {
 
     pub fn print(&self, ctx: &mut Context, buf: &mut String) {
         match &self.kind {
-            Abstraction { name, term } => {
+            Abs { name, term } => {
                 let x1 = ctx.pick_fresh_name(name);
                 buf.push_str("(lambda ");
                 buf.push_str(&x1);
@@ -150,14 +150,14 @@ impl Term {
                 term.print(ctx, buf);
                 buf.push(')');
             }
-            Application { target, val } => {
+            App { target, val } => {
                 buf.push('(');
                 target.print(ctx, buf);
                 buf.push(' ');
                 val.print(ctx, buf);
                 buf.push(')');
             }
-            Variable { idx, len } => {
+            Var { idx, len } => {
                 if ctx.len() == *len as usize {
                     buf.push_str(ctx.index_to_name(*idx as usize));
                 } else {

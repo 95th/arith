@@ -4,14 +4,14 @@ use arith::{
 };
 
 fn main() {
-    let t = U![Abstraction {
+    let t = U![Abs {
         name: String::from("a"),
-        term: U![Application {
-            target: U![Abstraction {
+        term: U![App {
+            target: U![Abs {
                 name: String::from("b"),
-                term: U![Variable { idx: 1, len: 2 }],
+                term: U![Var { idx: 1, len: 2 }],
             }],
-            val: U![Variable { idx: 0, len: 2 }],
+            val: U![Var { idx: 0, len: 2 }],
         }]
     }];
 
