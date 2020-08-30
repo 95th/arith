@@ -1,5 +1,5 @@
 use crate::span::Span;
-use std::rc::Rc;
+use std::{fmt, rc::Rc};
 use TermKind::*;
 
 #[macro_export]
@@ -263,7 +263,11 @@ impl Term {
                         if from == &ty_arg {
                             return to.clone();
                         } else {
-                            quit!("Parameter type mismatch");
+                            quit!(
+                                "Parameter type mismatch: expected: {:?}, actual: {:?}",
+                                ty_arg,
+                                from,
+                            );
                         }
                     }
                     _ => quit!("Arrow type expected"),
@@ -329,8 +333,17 @@ pub enum Binding {
     Variable(Rc<Ty>),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum Ty {
     Bool,
     Arrow { from: Rc<Ty>, to: Rc<Ty> },
+}
+
+impl fmt::Debug for Ty {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Ty::Bool => f.write_str("Bool"),
+            Ty::Arrow { from, to } => write!(f, "{:?} -> {:?}", from, to),
+        }
+    }
 }

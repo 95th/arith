@@ -7,7 +7,10 @@ use std::rc::Rc;
 fn main() {
     let t = U![Fun {
         name: String::from("a"),
-        ty: Rc::new(Ty::Bool),
+        ty: Rc::new(Ty::Arrow {
+            from: Rc::new(Ty::Bool),
+            to: Rc::new(Ty::Bool)
+        }),
         term: U![Call {
             callee: U![Fun {
                 name: String::from("b"),
