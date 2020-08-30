@@ -1,5 +1,5 @@
 use arith::{
-    lexer::{Lexer, TokenKind},
+    parser::Parser,
     untyped::{Context, TermKind::*, Ty},
     U,
 };
@@ -7,17 +7,19 @@ use std::rc::Rc;
 
 fn main() {
     let s = r#"
-        (lambda ax.ax)
-    "#;
-    let mut lex = Lexer::new(Rc::new(s.to_owned()));
-    loop {
-        let t = lex.next_token();
-        if t.kind == TokenKind::Eof {
-            break;
+        if true {
+            if true {
+                true
+            } else {
+                false
+            }
+        } else {
+            false
         }
-
-        println!("{:?}", t);
-    }
+    "#;
+    let mut p = Parser::new(Rc::new(s.to_owned()));
+    let e = p.parse_expr();
+    println!("{:#?}", e);
 }
 
 pub fn main2() {

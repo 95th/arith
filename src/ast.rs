@@ -5,6 +5,7 @@ pub struct Lambda {
     pub body: Expr,
 }
 
+#[derive(Debug)]
 pub enum Expr {
     True,
     False,

@@ -14,6 +14,8 @@ pub enum TokenKind {
     Lambda,
     True,
     False,
+    If,
+    Else,
 
     // Other Identifier
     Ident,

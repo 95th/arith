@@ -14,6 +14,8 @@ lazy_static! {
         map.insert(Symbol::intern("lambda"), TokenKind::Lambda);
         map.insert(Symbol::intern("true"), TokenKind::True);
         map.insert(Symbol::intern("false"), TokenKind::False);
+        map.insert(Symbol::intern("if"), TokenKind::If);
+        map.insert(Symbol::intern("else"), TokenKind::Else);
         map
     };
 }
