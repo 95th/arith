@@ -240,10 +240,10 @@ impl Term {
                     if ty1 == ty2 {
                         return ty1;
                     } else {
-                        panic!("Arms of Conditionals have different types");
+                        quit!("Arms of Conditionals have different types");
                     }
                 } else {
-                    panic!("Guard of conditional must be a boolean");
+                    quit!("Guard of conditional must be a boolean");
                 }
             }
             Var { idx, .. } => ctx.get_ty(*idx as usize),
@@ -263,10 +263,10 @@ impl Term {
                         if from == &ty_arg {
                             return to.clone();
                         } else {
-                            panic!("Parameter type mismatch");
+                            quit!("Parameter type mismatch");
                         }
                     }
-                    _ => panic!("Arrow type expected"),
+                    _ => quit!("Arrow type expected"),
                 }
             }
         }
@@ -311,7 +311,7 @@ impl Context {
     pub fn get_ty(&self, index: usize) -> Rc<Ty> {
         match self.get_binding(index) {
             Binding::Variable(ty) => ty.clone(),
-            _ => panic!(
+            _ => quit!(
                 "Wrong kind of binding for variable: {}",
                 self.index_to_name(index)
             ),
