@@ -5,6 +5,10 @@ use std::{collections::HashMap, fmt, mem, str::FromStr};
 pub struct Symbol(u32);
 
 impl Symbol {
+    pub fn dummy() -> Self {
+        Self::intern("")
+    }
+
     pub fn intern(s: &str) -> Self {
         with_interner(|interner| interner.intern(s))
     }

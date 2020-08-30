@@ -5,7 +5,8 @@ use crate::span::Span;
 use std::collections::HashMap;
 use std::rc::Rc;
 pub use symbol::Symbol;
-use token::{Token, TokenKind, TokenKind::*};
+pub use token::{Token, TokenKind};
+use TokenKind::*;
 
 lazy_static! {
     static ref KEYWORDS: HashMap<Symbol, TokenKind> = {
@@ -25,9 +26,9 @@ pub struct Lexer {
 }
 
 impl Lexer {
-    pub fn new(src: &Rc<String>) -> Self {
+    pub fn new(src: Rc<String>) -> Self {
         Self {
-            src: src.clone(),
+            src,
             start: 0,
             pos: 0,
             line: 1,
@@ -85,7 +86,8 @@ impl Lexer {
 
     fn token(&self, kind: TokenKind) -> Token {
         let span = self.span();
-        Token { kind, span }
+        let symbol = self.symbol();
+        Token { kind, span, symbol }
     }
 
     fn symbol(&self) -> Symbol {

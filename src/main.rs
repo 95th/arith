@@ -1,10 +1,26 @@
 use arith::{
+    lexer::{Lexer, TokenKind},
     untyped::{Context, TermKind::*, Ty},
     U,
 };
 use std::rc::Rc;
 
 fn main() {
+    let s = r#"
+        (lambda ax.ax)
+    "#;
+    let mut lex = Lexer::new(Rc::new(s.to_owned()));
+    loop {
+        let t = lex.next_token();
+        if t.kind == TokenKind::Eof {
+            break;
+        }
+
+        println!("{:?}", t);
+    }
+}
+
+pub fn main2() {
     let t = U![Fun {
         name: String::from("a"),
         ty: Rc::new(Ty::Arrow {

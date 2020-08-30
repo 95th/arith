@@ -43,7 +43,7 @@ impl Term {
     pub fn new(kind: TermKind) -> Self {
         Self {
             kind,
-            span: Span::DUMMY,
+            span: Span::dummy(),
         }
     }
 

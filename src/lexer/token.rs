@@ -1,11 +1,14 @@
+use super::Symbol;
 use crate::span::Span;
 
+#[derive(Debug)]
 pub struct Token {
     pub kind: TokenKind,
     pub span: Span,
+    pub symbol: Symbol,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TokenKind {
     // Keywords
     Lambda,

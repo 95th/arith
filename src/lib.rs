@@ -18,7 +18,9 @@ macro_rules! quit {
 #[macro_use]
 extern crate lazy_static;
 
+pub mod ast;
 pub mod initial;
 pub mod lexer;
+pub mod parser;
 pub mod span;
 pub mod untyped;

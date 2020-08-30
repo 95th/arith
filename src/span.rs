@@ -8,11 +8,13 @@ pub struct Span {
 }
 
 impl Span {
-    pub const DUMMY: Span = Span {
-        lo: 0,
-        hi: 0,
-        line: 0,
-    };
+    pub const fn dummy() -> Self {
+        Self {
+            lo: 0,
+            hi: 0,
+            line: 0,
+        }
+    }
 }
 
 impl fmt::Debug for Span {
