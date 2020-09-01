@@ -3,15 +3,7 @@ use std::rc::Rc;
 
 fn main() {
     let s = r#"
-        if true {
-            if true {
-                true
-            } else {
-                false
-            }
-        } else {
-            false
-        }
+        if iszero pred succ 0 { 0 } else { succ 0 }
     "#;
 
     let mut p = Parser::new(Rc::new(s.to_owned()));

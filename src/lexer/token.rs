@@ -16,6 +16,10 @@ pub enum TokenKind {
     False,
     If,
     Else,
+    Zero,
+    Succ,
+    Pred,
+    IsZero,
 
     // Other Identifier
     Ident,

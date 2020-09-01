@@ -19,11 +19,15 @@ pub struct Term {
 pub enum TermKind {
     True,
     False,
+    Zero,
     If {
         cond: Rc<Term>,
         then_branch: Rc<Term>,
         else_branch: Rc<Term>,
     },
+    Succ(Rc<Term>),
+    Pred(Rc<Term>),
+    IsZero(Rc<Term>),
     Var {
         idx: u32,
         len: u32,
@@ -153,7 +157,7 @@ impl Term {
             F: Fn(Span, u32, u32, u32) -> Rc<Term>,
         {
             let kind = match &term.kind {
-                True | False => return term.clone(),
+                True | False | Zero => return term.clone(),
                 If {
                     cond,
                     then_branch,
@@ -162,6 +166,17 @@ impl Term {
                     cond: walk(cond, ctx, map_fn),
                     then_branch: walk(then_branch, ctx, map_fn),
                     else_branch: walk(else_branch, ctx, map_fn),
+                },
+                Succ(t) => Succ(walk(t, ctx, map_fn)),
+                Pred(t) => match &t.kind {
+                    Zero => Zero,
+                    Succ(t1) => return t1.clone(),
+                    _ => Pred(walk(t, ctx, map_fn)),
+                },
+                IsZero(t) => match &t.kind {
+                    Zero => True,
+                    Succ(_) => False,
+                    _ => IsZero(walk(t, ctx, map_fn)),
                 },
                 Var { idx, len } => return map_fn(term.span, ctx, *idx, *len),
                 Fun { name, ty, term } => Fun {
@@ -188,6 +203,7 @@ impl Term {
         match &self.kind {
             True => buf.push_str("true"),
             False => buf.push_str("false"),
+            Zero => buf.push('0'),
             If {
                 cond,
                 then_branch,
@@ -200,6 +216,18 @@ impl Term {
                 buf.push_str(" } else { ");
                 else_branch.print(ctx, buf);
                 buf.push_str(" }");
+            }
+            Succ(t) => {
+                buf.push_str("succ ");
+                t.print(ctx, buf);
+            }
+            Pred(t) => {
+                buf.push_str("pred ");
+                t.print(ctx, buf);
+            }
+            IsZero(t) => {
+                buf.push_str("iszero ");
+                t.print(ctx, buf);
             }
             Fun { name, term, .. } => {
                 let x1 = ctx.pick_fresh_name(*name);
@@ -230,12 +258,13 @@ impl Term {
     pub fn type_of(&self, ctx: &Context) -> Rc<Ty> {
         match &self.kind {
             True | False => Rc::new(Ty::Bool),
+            Zero => Rc::new(Ty::Nat),
             If {
                 cond,
                 then_branch,
                 else_branch,
             } => {
-                if cond.type_of(ctx) == Rc::new(Ty::Bool) {
+                if &*cond.type_of(ctx) == &Ty::Bool {
                     let ty1 = then_branch.type_of(ctx);
                     let ty2 = else_branch.type_of(ctx);
                     if ty1 == ty2 {
@@ -245,6 +274,21 @@ impl Term {
                     }
                 } else {
                     quit!("Guard of conditional must be a boolean");
+                }
+            }
+            Succ(t) | Pred(t) => {
+                let ty = t.type_of(ctx);
+                if &*ty == &Ty::Nat {
+                    return ty;
+                } else {
+                    quit!("argument must be a Nat");
+                }
+            }
+            IsZero(t) => {
+                if &*t.type_of(ctx) == &Ty::Nat {
+                    return Rc::new(Ty::Bool);
+                } else {
+                    quit!("argument must be a Nat");
                 }
             }
             Var { idx, .. } => ctx.get_ty(*idx as usize),
@@ -338,6 +382,7 @@ pub enum Binding {
 #[derive(Clone, PartialEq)]
 pub enum Ty {
     Bool,
+    Nat,
     Arrow { from: Rc<Ty>, to: Rc<Ty> },
 }
 
@@ -345,6 +390,7 @@ impl fmt::Debug for Ty {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Ty::Bool => f.write_str("Bool"),
+            Ty::Nat => f.write_str("Nat"),
             Ty::Arrow { from, to } => write!(f, "{:?} -> {:?}", from, to),
         }
     }

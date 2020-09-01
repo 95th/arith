@@ -37,6 +37,29 @@ impl Parser {
                 kind: TermKind::False,
                 span: self.curr.span,
             }
+        } else if self.eat(Zero) {
+            Term {
+                kind: TermKind::Zero,
+                span: self.curr.span,
+            }
+        } else if self.eat(Succ) {
+            let term = self.parse_expr();
+            Term {
+                kind: TermKind::Succ(Rc::new(term)),
+                span: self.curr.span,
+            }
+        } else if self.eat(Pred) {
+            let term = self.parse_expr();
+            Term {
+                kind: TermKind::Pred(Rc::new(term)),
+                span: self.curr.span,
+            }
+        } else if self.eat(IsZero) {
+            let term = self.parse_expr();
+            Term {
+                kind: TermKind::IsZero(Rc::new(term)),
+                span: self.curr.span,
+            }
         } else if self.eat(If) {
             let lo = self.curr.span;
             let cond = self.parse_expr();

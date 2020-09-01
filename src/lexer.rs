@@ -16,6 +16,9 @@ lazy_static! {
         map.insert(Symbol::intern("false"), TokenKind::False);
         map.insert(Symbol::intern("if"), TokenKind::If);
         map.insert(Symbol::intern("else"), TokenKind::Else);
+        map.insert(Symbol::intern("succ"), TokenKind::Succ);
+        map.insert(Symbol::intern("pred"), TokenKind::Pred);
+        map.insert(Symbol::intern("iszero"), TokenKind::IsZero);
         map
     };
 }
@@ -61,9 +64,9 @@ impl Lexer {
                     self.line += 1;
                     continue;
                 }
+                b'0' => Zero,
                 c if c.is_ascii_whitespace() => continue,
                 c if c.is_ascii_alphabetic() => self.ident(),
-                c if c.is_ascii_digit() => self.number(),
                 c => quit!("Unknown character: {}", c as char),
             };
             return self.token(kind);
@@ -79,11 +82,6 @@ impl Lexer {
             .get(&symbol)
             .copied()
             .unwrap_or_else(|| TokenKind::Ident)
-    }
-
-    fn number(&mut self) -> TokenKind {
-        self.eat_while(|c| c.is_ascii_digit());
-        TokenKind::Number
     }
 
     fn token(&self, kind: TokenKind) -> Token {
