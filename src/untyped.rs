@@ -1,4 +1,4 @@
-use crate::span::Span;
+use crate::{lexer::Symbol, span::Span};
 use std::{fmt, rc::Rc};
 use TermKind::*;
 
@@ -11,8 +11,8 @@ macro_rules! U {
 
 #[derive(Debug)]
 pub struct Term {
-    kind: TermKind,
-    span: Span,
+    pub kind: TermKind,
+    pub span: Span,
 }
 
 #[derive(Debug)]
@@ -29,7 +29,7 @@ pub enum TermKind {
         len: u32,
     },
     Fun {
-        name: String,
+        name: Symbol,
         ty: Rc<Ty>,
         term: Rc<Term>,
     },
@@ -202,9 +202,9 @@ impl Term {
                 buf.push_str(" }");
             }
             Fun { name, term, .. } => {
-                let x1 = ctx.pick_fresh_name(name);
+                let x1 = ctx.pick_fresh_name(*name);
                 buf.push_str("(lambda ");
-                buf.push_str(&x1);
+                x1.as_str_with(|s| buf.push_str(s));
                 buf.push_str(". ");
                 term.print(ctx, buf);
                 buf.push(')');
@@ -218,7 +218,8 @@ impl Term {
             }
             Var { idx, len } => {
                 if ctx.len() == *len as usize {
-                    buf.push_str(ctx.index_to_name(*idx as usize));
+                    let name = ctx.index_to_name(*idx as usize);
+                    name.as_str_with(|s| buf.push_str(s));
                 } else {
                     buf.push_str("[bad index]");
                 }
@@ -248,7 +249,7 @@ impl Term {
             }
             Var { idx, .. } => ctx.get_ty(*idx as usize),
             Fun { name, ty, term } => {
-                let ctx = ctx.add_binding(name, Binding::Variable(ty.clone()));
+                let ctx = ctx.add_binding(*name, Binding::Variable(ty.clone()));
                 let to = term.type_of(&ctx);
                 Rc::new(Ty::Arrow {
                     from: ty.clone(),
@@ -279,7 +280,7 @@ impl Term {
 
 #[derive(Default)]
 pub struct Context {
-    list: Vec<(String, Binding)>,
+    list: Vec<(Symbol, Binding)>,
 }
 
 impl Context {
@@ -287,28 +288,29 @@ impl Context {
         self.list.len()
     }
 
-    pub fn index_to_name(&self, index: usize) -> &str {
-        &self.list[index].0
+    pub fn index_to_name(&self, index: usize) -> Symbol {
+        self.list[index].0
     }
 
-    pub fn pick_fresh_name(&mut self, name: &str) -> String {
-        let mut name = name.to_owned();
+    pub fn pick_fresh_name(&mut self, mut name: Symbol) -> Symbol {
         if self.is_name_bound(&name) {
-            name.push('\'');
-            self.pick_fresh_name(&name)
-        } else {
-            self.list.push((name.clone(), Binding::Name));
-            name
+            let mut buf = name.as_str_with(|s| s.to_owned());
+            while self.is_name_bound(&name) {
+                buf.push('\'');
+                name = Symbol::intern(&buf);
+            }
         }
+        self.list.push((name, Binding::Name));
+        name
     }
 
-    pub fn is_name_bound(&self, name: &str) -> bool {
+    pub fn is_name_bound(&self, name: &Symbol) -> bool {
         self.list.iter().any(|(n, _)| n == name)
     }
 
-    pub fn add_binding(&self, name: &str, binding: Binding) -> Self {
+    pub fn add_binding(&self, name: Symbol, binding: Binding) -> Self {
         let mut list = self.list.clone();
-        list.push((name.to_owned(), binding));
+        list.push((name, binding));
         Self { list }
     }
 

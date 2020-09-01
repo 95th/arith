@@ -1,4 +1,5 @@
 use arith::{
+    lexer::Symbol,
     parser::Parser,
     untyped::{Context, TermKind::*, Ty},
     U,
@@ -24,14 +25,14 @@ fn main() {
 
 pub fn main2() {
     let t = U![Fun {
-        name: String::from("a"),
+        name: Symbol::intern("a"),
         ty: Rc::new(Ty::Arrow {
             from: Rc::new(Ty::Bool),
             to: Rc::new(Ty::Bool)
         }),
         term: U![Call {
             callee: U![Fun {
-                name: String::from("b"),
+                name: Symbol::intern("b"),
                 ty: Rc::new(Ty::Bool),
                 term: U![Var { idx: 1, len: 2 }],
             }],
