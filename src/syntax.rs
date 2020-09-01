@@ -82,22 +82,18 @@ impl Eval {
                 cond,
                 then_branch,
                 else_branch,
-            } => match &cond.kind {
-                True => Some(then_branch.clone()),
-                False => Some(else_branch.clone()),
-                _ => Some(Rc::new(Term {
-                    kind: If {
-                        cond: self.eval_1(cond, ctx)?,
-                        then_branch: then_branch.clone(),
-                        else_branch: else_branch.clone(),
-                    },
-                    span: term.span,
-                })),
-            },
+            } => {
+                let cond = self.eval(cond, ctx);
+                match &cond.kind {
+                    True => Some(self.eval(then_branch, ctx)),
+                    False => Some(self.eval(else_branch, ctx)),
+                    _ => None,
+                }
+            }
             Call { callee, arg } => match &callee.kind {
                 Fun { term, .. } if arg.is_val(ctx) => Some(self.subst_top(arg, term.clone())),
                 _ if callee.is_val(ctx) => {
-                    let arg = self.eval_1(arg, ctx)?;
+                    let arg = self.eval(arg, ctx);
                     Some(Rc::new(Term {
                         kind: Call {
                             callee: callee.clone(),
@@ -107,7 +103,7 @@ impl Eval {
                     }))
                 }
                 _ => {
-                    let callee = self.eval_1(callee, ctx)?;
+                    let callee = self.eval(callee, ctx);
                     Some(Rc::new(Term {
                         kind: Call {
                             callee,
@@ -117,6 +113,32 @@ impl Eval {
                     }))
                 }
             },
+            Succ(t) => Some(Rc::new(Term {
+                kind: Succ(self.eval(t, ctx)),
+                span: term.span,
+            })),
+            Pred(t) => {
+                let t = self.eval(t, ctx);
+                match &t.kind {
+                    Zero => Some(Rc::new(Term {
+                        kind: Zero,
+                        span: term.span,
+                    })),
+                    Succ(t) => Some(t.clone()),
+                    _ => return None,
+                }
+            }
+            IsZero(t) => {
+                let t = self.eval(t, ctx);
+                let kind = match &t.kind {
+                    Zero => True,
+                    _ => False,
+                };
+                Some(Rc::new(Term {
+                    kind,
+                    span: term.span,
+                }))
+            }
             _ => None,
         }
     }
