@@ -1,7 +1,7 @@
 use crate::{
     lexer::{Lexer, Symbol, Token, TokenKind, TokenKind::*},
     span::Span,
-    untyped::{Term, TermKind},
+    syntax::{Term, TermKind},
 };
 use std::rc::Rc;
 

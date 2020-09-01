@@ -1,4 +1,4 @@
-use arith::{parser::Parser, untyped::Context};
+use arith::{parser::Parser, syntax::Context};
 use std::rc::Rc;
 
 fn main() {
