@@ -15,6 +15,14 @@ impl Span {
             line: 0,
         }
     }
+
+    pub fn to(&self, other: Self) -> Self {
+        Self {
+            lo: self.lo.min(other.lo),
+            hi: self.hi.max(other.hi),
+            line: self.line.min(other.line),
+        }
+    }
 }
 
 impl fmt::Debug for Span {

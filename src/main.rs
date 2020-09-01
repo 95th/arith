@@ -1,9 +1,4 @@
-use arith::{
-    lexer::Symbol,
-    parser::Parser,
-    untyped::{Context, TermKind::*, Ty},
-    U,
-};
+use arith::{parser::Parser, untyped::Context};
 use std::rc::Rc;
 
 fn main() {
@@ -18,29 +13,16 @@ fn main() {
             false
         }
     "#;
-    let mut p = Parser::new(Rc::new(s.to_owned()));
-    let e = p.parse_expr();
-    println!("{:#?}", e);
-}
 
-pub fn main2() {
-    let t = U![Fun {
-        name: Symbol::intern("a"),
-        ty: Rc::new(Ty::Arrow {
-            from: Rc::new(Ty::Bool),
-            to: Rc::new(Ty::Bool)
-        }),
-        term: U![Call {
-            callee: U![Fun {
-                name: Symbol::intern("b"),
-                ty: Rc::new(Ty::Bool),
-                term: U![Var { idx: 1, len: 2 }],
-            }],
-            arg: U![Var { idx: 0, len: 2 }],
-        }]
-    }];
+    let mut p = Parser::new(Rc::new(s.to_owned()));
+    let t = Rc::new(p.parse_expr());
 
     let ctx = &mut Context::default();
+
+    let buf = &mut String::new();
+    t.print(ctx, buf);
+    println!("{}", buf);
+
     let t = t.eval(ctx);
 
     let buf = &mut String::new();

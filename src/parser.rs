@@ -1,7 +1,7 @@
 use crate::{
-    ast::Expr,
     lexer::{Lexer, Symbol, Token, TokenKind, TokenKind::*},
     span::Span,
+    untyped::{Term, TermKind},
 };
 use std::rc::Rc;
 
@@ -26,12 +26,19 @@ impl Parser {
         }
     }
 
-    pub fn parse_expr(&mut self) -> Expr {
+    pub fn parse_expr(&mut self) -> Term {
         if self.eat(True) {
-            Expr::True
+            Term {
+                kind: TermKind::True,
+                span: self.curr.span,
+            }
         } else if self.eat(False) {
-            Expr::False
+            Term {
+                kind: TermKind::False,
+                span: self.curr.span,
+            }
         } else if self.eat(If) {
+            let lo = self.curr.span;
             let cond = self.parse_expr();
             self.consume(OpenBrace, "Expected '{' after If condition");
             let yes = self.parse_expr();
@@ -40,10 +47,15 @@ impl Parser {
             self.consume(OpenBrace, "Expected '{' after else");
             let no = self.parse_expr();
             self.consume(CloseBrace, "Expected '}'");
-            Expr::If {
-                cond: Box::new(cond),
-                yes: Box::new(yes),
-                no: Box::new(no),
+
+            let span = lo.to(self.curr.span);
+            Term {
+                kind: TermKind::If {
+                    cond: Rc::new(cond),
+                    then_branch: Rc::new(yes),
+                    else_branch: Rc::new(no),
+                },
+                span,
             }
         } else {
             quit!("Unexpected token: {:?}", self.curr.kind);
