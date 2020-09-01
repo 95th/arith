@@ -67,7 +67,7 @@ impl Lexer {
                 b'0' => Zero,
                 c if c.is_ascii_whitespace() => continue,
                 c if c.is_ascii_alphabetic() => self.ident(),
-                c => quit!("Unknown character: {}", c as char),
+                _ => quit!(&self.src, self.span(), "Unknown character"),
             };
             return self.token(kind);
         }

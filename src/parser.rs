@@ -9,6 +9,7 @@ pub struct Parser {
     lexer: Lexer,
     curr: Token,
     prev: Token,
+    src: Rc<String>,
 }
 
 impl Parser {
@@ -23,6 +24,7 @@ impl Parser {
                 span: Span::dummy(),
                 symbol: Symbol::dummy(),
             },
+            src,
         }
     }
 
@@ -30,38 +32,41 @@ impl Parser {
         if self.eat(True) {
             Term {
                 kind: TermKind::True,
-                span: self.curr.span,
+                span: self.prev.span,
             }
         } else if self.eat(False) {
             Term {
                 kind: TermKind::False,
-                span: self.curr.span,
+                span: self.prev.span,
             }
         } else if self.eat(Zero) {
             Term {
                 kind: TermKind::Zero,
-                span: self.curr.span,
+                span: self.prev.span,
             }
         } else if self.eat(Succ) {
+            let lo = self.prev.span;
             let term = self.parse_expr();
             Term {
                 kind: TermKind::Succ(Rc::new(term)),
-                span: self.curr.span,
+                span: lo.to(self.prev.span),
             }
         } else if self.eat(Pred) {
+            let lo = self.prev.span;
             let term = self.parse_expr();
             Term {
                 kind: TermKind::Pred(Rc::new(term)),
-                span: self.curr.span,
+                span: lo.to(self.prev.span),
             }
         } else if self.eat(IsZero) {
+            let lo = self.prev.span;
             let term = self.parse_expr();
             Term {
                 kind: TermKind::IsZero(Rc::new(term)),
-                span: self.curr.span,
+                span: lo.to(self.prev.span),
             }
         } else if self.eat(If) {
-            let lo = self.curr.span;
+            let lo = self.prev.span;
             let cond = self.parse_expr();
             self.consume(OpenBrace, "Expected '{' after If condition");
             let yes = self.parse_expr();
@@ -71,7 +76,7 @@ impl Parser {
             let no = self.parse_expr();
             self.consume(CloseBrace, "Expected '}'");
 
-            let span = lo.to(self.curr.span);
+            let span = lo.to(self.prev.span);
             Term {
                 kind: TermKind::If {
                     cond: Rc::new(cond),
@@ -81,7 +86,12 @@ impl Parser {
                 span,
             }
         } else {
-            quit!("Unexpected token: {:?}", self.curr.kind);
+            quit!(
+                &self.src,
+                self.curr.span,
+                "Unexpected token: {:?}",
+                self.curr.kind
+            );
         }
     }
 
@@ -90,7 +100,7 @@ impl Parser {
             return;
         }
 
-        quit!("{} at {:?}, expected: {:?}", msg, self.curr, kind);
+        quit!(&self.src, self.curr.span, msg);
     }
 
     fn eat(&mut self, kind: TokenKind) -> bool {

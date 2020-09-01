@@ -61,13 +61,23 @@ impl Term {
             _ => false,
         }
     }
+}
 
-    pub fn eval(self: &Rc<Self>, ctx: &mut Context) -> Rc<Self> {
-        self.eval_1(ctx).unwrap_or_else(|| self.clone())
+pub struct Eval {
+    src: Rc<String>,
+}
+
+impl Eval {
+    pub fn new(src: Rc<String>) -> Self {
+        Self { src }
     }
 
-    fn eval_1(self: &Rc<Self>, ctx: &mut Context) -> Option<Rc<Self>> {
-        match &self.kind {
+    pub fn eval(&self, term: &Rc<Term>, ctx: &mut Context) -> Rc<Term> {
+        self.eval_1(term, ctx).unwrap_or_else(|| term.clone())
+    }
+
+    fn eval_1(&self, term: &Rc<Term>, ctx: &mut Context) -> Option<Rc<Term>> {
+        match &term.kind {
             If {
                 cond,
                 then_branch,
@@ -77,33 +87,33 @@ impl Term {
                 False => Some(else_branch.clone()),
                 _ => Some(Rc::new(Term {
                     kind: If {
-                        cond: cond.eval_1(ctx)?,
+                        cond: self.eval_1(cond, ctx)?,
                         then_branch: then_branch.clone(),
                         else_branch: else_branch.clone(),
                     },
-                    span: self.span,
+                    span: term.span,
                 })),
             },
             Call { callee, arg } => match &callee.kind {
-                Fun { term, .. } if arg.is_val(ctx) => Some(arg.subst_top(term.clone())),
+                Fun { term, .. } if arg.is_val(ctx) => Some(self.subst_top(arg, term.clone())),
                 _ if callee.is_val(ctx) => {
-                    let arg = arg.eval_1(ctx)?;
+                    let arg = self.eval_1(arg, ctx)?;
                     Some(Rc::new(Term {
                         kind: Call {
                             callee: callee.clone(),
                             arg,
                         },
-                        span: self.span,
+                        span: term.span,
                     }))
                 }
                 _ => {
-                    let callee = callee.eval_1(ctx)?;
+                    let callee = self.eval_1(callee, ctx)?;
                     Some(Rc::new(Term {
                         kind: Call {
                             callee,
                             arg: arg.clone(),
                         },
-                        span: self.span,
+                        span: term.span,
                     }))
                 }
             },
@@ -111,16 +121,16 @@ impl Term {
         }
     }
 
-    pub fn subst_top(self: &Rc<Self>, subst_term: Rc<Self>) -> Rc<Self> {
-        let subst_term = subst_term.shift(1);
-        let term = self.subst(0, subst_term);
-        term.shift(-1)
+    pub fn subst_top(&self, term: &Rc<Term>, subst_term: Rc<Term>) -> Rc<Term> {
+        let subst_term = self.shift(&subst_term, 1);
+        let term = self.subst(term, 0, subst_term);
+        self.shift(&term, -1)
     }
 
-    pub fn subst(self: &Rc<Self>, term_idx: u32, subst_term: Rc<Self>) -> Rc<Self> {
-        self.map(0, &|span, ctx, idx, len| {
+    pub fn subst(&self, term: &Rc<Term>, term_idx: u32, subst_term: Rc<Term>) -> Rc<Term> {
+        self.map(term, 0, &|span, ctx, idx, len| {
             if idx == term_idx + ctx {
-                subst_term.shift(ctx as i32)
+                self.shift(&subst_term, ctx as i32)
             } else {
                 Rc::new(Term {
                     kind: Var { idx, len },
@@ -130,8 +140,8 @@ impl Term {
         })
     }
 
-    pub fn shift_above(self: &Rc<Self>, ctx: u32, dist: i32) -> Rc<Self> {
-        self.map(ctx, &|span, ctx, idx, len| {
+    pub fn shift_above(&self, term: &Rc<Term>, ctx: u32, dist: i32) -> Rc<Term> {
+        self.map(term, ctx, &|span, ctx, idx, len| {
             let kind = Var {
                 idx: if idx >= ctx {
                     ((idx as i32) + dist) as u32
@@ -144,11 +154,11 @@ impl Term {
         })
     }
 
-    pub fn shift(self: &Rc<Self>, dist: i32) -> Rc<Self> {
-        self.shift_above(0, dist)
+    pub fn shift(&self, term: &Rc<Term>, dist: i32) -> Rc<Term> {
+        self.shift_above(term, 0, dist)
     }
 
-    fn map<F>(self: &Rc<Self>, ctx: u32, map_fn: &F) -> Rc<Self>
+    fn map<F>(&self, term: &Rc<Term>, ctx: u32, map_fn: &F) -> Rc<Term>
     where
         F: Fn(Span, u32, u32, u32) -> Rc<Term>,
     {
@@ -196,11 +206,11 @@ impl Term {
             })
         }
 
-        walk(self, ctx, map_fn)
+        walk(term, ctx, map_fn)
     }
 
-    pub fn print(&self, ctx: &mut Context, buf: &mut String) {
-        match &self.kind {
+    pub fn print(&self, term: &Term, ctx: &mut Context, buf: &mut String) {
+        match &term.kind {
             True => buf.push_str("true"),
             False => buf.push_str("false"),
             Zero => buf.push('0'),
@@ -210,38 +220,38 @@ impl Term {
                 else_branch,
             } => {
                 buf.push_str("if ");
-                cond.print(ctx, buf);
+                self.print(cond, ctx, buf);
                 buf.push_str(" { ");
-                then_branch.print(ctx, buf);
+                self.print(then_branch, ctx, buf);
                 buf.push_str(" } else { ");
-                else_branch.print(ctx, buf);
+                self.print(else_branch, ctx, buf);
                 buf.push_str(" }");
             }
             Succ(t) => {
                 buf.push_str("succ ");
-                t.print(ctx, buf);
+                self.print(t, ctx, buf);
             }
             Pred(t) => {
                 buf.push_str("pred ");
-                t.print(ctx, buf);
+                self.print(t, ctx, buf);
             }
             IsZero(t) => {
                 buf.push_str("iszero ");
-                t.print(ctx, buf);
+                self.print(t, ctx, buf);
             }
             Fun { name, term, .. } => {
                 let x1 = ctx.pick_fresh_name(*name);
                 buf.push_str("(lambda ");
                 x1.as_str_with(|s| buf.push_str(s));
                 buf.push_str(". ");
-                term.print(ctx, buf);
+                self.print(term, ctx, buf);
                 buf.push(')');
             }
             Call { callee, arg } => {
                 buf.push('(');
-                callee.print(ctx, buf);
+                self.print(callee, ctx, buf);
                 buf.push(' ');
-                arg.print(ctx, buf);
+                self.print(arg, ctx, buf);
                 buf.push(')');
             }
             Var { idx, len } => {
@@ -255,8 +265,8 @@ impl Term {
         }
     }
 
-    pub fn type_of(&self, ctx: &Context) -> Rc<Ty> {
-        match &self.kind {
+    pub fn type_of(&self, term: &Term, ctx: &Context) -> Rc<Ty> {
+        match &term.kind {
             True | False => Rc::new(Ty::Bool),
             Zero => Rc::new(Ty::Nat),
             If {
@@ -264,58 +274,68 @@ impl Term {
                 then_branch,
                 else_branch,
             } => {
-                if &*cond.type_of(ctx) == &Ty::Bool {
-                    let ty1 = then_branch.type_of(ctx);
-                    let ty2 = else_branch.type_of(ctx);
+                if &*self.type_of(cond, ctx) == &Ty::Bool {
+                    let ty1 = self.type_of(then_branch, ctx);
+                    let ty2 = self.type_of(else_branch, ctx);
                     if ty1 == ty2 {
                         return ty1;
                     } else {
-                        quit!("Arms of Conditionals have different types");
+                        quit!(
+                            &self.src,
+                            term.span,
+                            "Arms of Conditionals have different types"
+                        );
                     }
                 } else {
-                    quit!("Guard of conditional must be a boolean");
+                    quit!(
+                        &self.src,
+                        cond.span,
+                        "Guard of conditional must be a boolean"
+                    );
                 }
             }
             Succ(t) | Pred(t) => {
-                let ty = t.type_of(ctx);
+                let ty = self.type_of(t, ctx);
                 if &*ty == &Ty::Nat {
                     return ty;
                 } else {
-                    quit!("argument must be a Nat");
+                    quit!(&self.src, t.span, "argument must be a Nat");
                 }
             }
             IsZero(t) => {
-                if &*t.type_of(ctx) == &Ty::Nat {
+                if &*self.type_of(t, ctx) == &Ty::Nat {
                     return Rc::new(Ty::Bool);
                 } else {
-                    quit!("argument must be a Nat");
+                    quit!(&self.src, t.span, "argument must be a Nat");
                 }
             }
-            Var { idx, .. } => ctx.get_ty(*idx as usize),
+            Var { idx, .. } => ctx.get_ty(&self.src, term.span, *idx as usize),
             Fun { name, ty, term } => {
                 let ctx = ctx.add_binding(*name, Binding::Variable(ty.clone()));
-                let to = term.type_of(&ctx);
+                let to = self.type_of(term, &ctx);
                 Rc::new(Ty::Arrow {
                     from: ty.clone(),
                     to,
                 })
             }
             Call { callee, arg } => {
-                let ty_callee = callee.type_of(ctx);
-                let ty_arg = arg.type_of(ctx);
+                let ty_callee = self.type_of(callee, ctx);
+                let ty_arg = self.type_of(arg, ctx);
                 match &*ty_callee {
                     Ty::Arrow { from, to } => {
                         if from == &ty_arg {
                             return to.clone();
                         } else {
                             quit!(
+                                &self.src,
+                                term.span,
                                 "Parameter type mismatch: expected: {:?}, actual: {:?}",
                                 ty_arg,
                                 from,
                             );
                         }
                     }
-                    _ => quit!("Arrow type expected"),
+                    _ => quit!(&self.src, term.span, "Arrow type expected"),
                 }
             }
         }
@@ -358,10 +378,12 @@ impl Context {
         Self { list }
     }
 
-    pub fn get_ty(&self, index: usize) -> Rc<Ty> {
+    pub fn get_ty(&self, src: &Rc<String>, span: Span, index: usize) -> Rc<Ty> {
         match self.get_binding(index) {
             Binding::Variable(ty) => ty.clone(),
             _ => quit!(
+                src,
+                span,
                 "Wrong kind of binding for variable: {}",
                 self.index_to_name(index)
             ),
