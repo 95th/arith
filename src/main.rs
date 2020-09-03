@@ -6,20 +6,20 @@ use std::rc::Rc;
 
 fn main() {
     let s = r#"
-        if if true { iszero 0 } else { iszero succ 0 } { succ succ pred if true { succ 0 } else { succ succ 0 } } else { succ 0 }
+        lambda a: bool -> lambda a: nat -> lambda a: nat -> iszero 0
     "#;
 
     let src = Rc::new(s.to_owned());
+    let tyctx = &mut TyContext::new();
 
     let mut p = Parser::new(src.clone());
-    let t = Rc::new(p.parse_expr());
+    let t = Rc::new(p.parse_expr(tyctx));
 
     let eval = Eval::new(src);
 
     let ctx = &mut Context::default();
-    let ty_ctx = &mut TyContext::new();
-    let ty = eval.type_of(&t, ctx, ty_ctx);
-    ty_ctx.print(ty);
+    let ty = eval.type_of(&t, ctx, tyctx);
+    tyctx.print(ty);
 
     let ctx = &mut Context::default();
 
@@ -29,6 +29,7 @@ fn main() {
 
     let t = eval.eval(&t, ctx);
 
+    let ctx = &mut Context::default();
     let buf = &mut String::new();
     eval.print(&t, ctx, buf);
     println!("{}", buf);

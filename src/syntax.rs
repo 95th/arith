@@ -438,6 +438,14 @@ impl TyContext {
         i
     }
 
+    pub fn new_ty(&mut self, symbol: Symbol) -> TypeId {
+        symbol.as_str_with(|s| match s {
+            "bool" => self.common.boolean,
+            "nat" => self.common.nat,
+            _ => todo!("Dont know how"),
+        })
+    }
+
     pub fn get(&self, id: TypeId) -> &Ty {
         &self.types[id]
     }
