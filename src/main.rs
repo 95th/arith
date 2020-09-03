@@ -1,6 +1,6 @@
 use arith::{
     parser::Parser,
-    syntax::{Context, Eval},
+    syntax::{Context, Eval, TyContext},
 };
 use std::rc::Rc;
 
@@ -17,8 +17,9 @@ fn main() {
     let eval = Eval::new(src);
 
     let ctx = &mut Context::default();
-    let ty = eval.type_of(&t, ctx);
-    println!("{:?}", ty);
+    let ty_ctx = &mut TyContext::new();
+    let ty = eval.type_of(&t, ctx, ty_ctx);
+    ty_ctx.print(ty);
 
     let ctx = &mut Context::default();
 

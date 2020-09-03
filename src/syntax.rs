@@ -1,5 +1,5 @@
 use crate::{lexer::Symbol, span::Span};
-use std::{fmt, rc::Rc};
+use std::rc::Rc;
 use TermKind::*;
 
 #[macro_export]
@@ -34,7 +34,7 @@ pub enum TermKind {
     },
     Fun {
         name: Symbol,
-        ty: Rc<Ty>,
+        ty: TypeId,
         term: Rc<Term>,
     },
     Call {
@@ -287,18 +287,18 @@ impl Eval {
         }
     }
 
-    pub fn type_of(&self, term: &Term, ctx: &Context) -> Rc<Ty> {
+    pub fn type_of(&self, term: &Term, ctx: &Context, tyctx: &mut TyContext) -> TypeId {
         match &term.kind {
-            True | False => Rc::new(Ty::Bool),
-            Zero => Rc::new(Ty::Nat),
+            True | False => tyctx.common.boolean,
+            Zero => tyctx.common.nat,
             If {
                 cond,
                 then_branch,
                 else_branch,
             } => {
-                if &*self.type_of(cond, ctx) == &Ty::Bool {
-                    let ty1 = self.type_of(then_branch, ctx);
-                    let ty2 = self.type_of(else_branch, ctx);
+                if self.type_of(cond, ctx, tyctx) == tyctx.common.boolean {
+                    let ty1 = self.type_of(then_branch, ctx, tyctx);
+                    let ty2 = self.type_of(else_branch, ctx, tyctx);
                     if ty1 == ty2 {
                         return ty1;
                     } else {
@@ -317,36 +317,33 @@ impl Eval {
                 }
             }
             Succ(t) | Pred(t) => {
-                let ty = self.type_of(t, ctx);
-                if &*ty == &Ty::Nat {
+                let ty = self.type_of(t, ctx, tyctx);
+                if ty == tyctx.common.nat {
                     return ty;
                 } else {
                     quit!(&self.src, t.span, "argument must be a Nat");
                 }
             }
             IsZero(t) => {
-                if &*self.type_of(t, ctx) == &Ty::Nat {
-                    return Rc::new(Ty::Bool);
+                if self.type_of(t, ctx, tyctx) == tyctx.common.nat {
+                    return tyctx.common.boolean;
                 } else {
                     quit!(&self.src, t.span, "argument must be a Nat");
                 }
             }
             Var { idx, .. } => ctx.get_ty(&self.src, term.span, *idx as usize),
             Fun { name, ty, term } => {
-                let ctx = ctx.add_binding(*name, Binding::Variable(ty.clone()));
-                let to = self.type_of(term, &ctx);
-                Rc::new(Ty::Arrow {
-                    from: ty.clone(),
-                    to,
-                })
+                let ctx = ctx.add_binding(*name, Binding::Variable(*ty));
+                let to = self.type_of(term, &ctx, tyctx);
+                tyctx.new_arrow(*ty, to)
             }
             Call { callee, arg } => {
-                let ty_callee = self.type_of(callee, ctx);
-                let ty_arg = self.type_of(arg, ctx);
-                match &*ty_callee {
-                    Ty::Arrow { from, to } => {
-                        if from == &ty_arg {
-                            return to.clone();
+                let ty_callee = self.type_of(callee, ctx, tyctx);
+                let ty_arg = self.type_of(arg, ctx, tyctx);
+                match tyctx.get(ty_callee) {
+                    &Ty::Arrow { from, to } => {
+                        if from == ty_arg {
+                            return to;
                         } else {
                             quit!(
                                 &self.src,
@@ -400,9 +397,9 @@ impl Context {
         Self { list }
     }
 
-    pub fn get_ty(&self, src: &Rc<String>, span: Span, index: usize) -> Rc<Ty> {
+    pub fn get_ty(&self, src: &Rc<String>, span: Span, index: usize) -> TypeId {
         match self.get_binding(index) {
-            Binding::Variable(ty) => ty.clone(),
+            Binding::Variable(ty) => *ty,
             _ => quit!(
                 src,
                 span,
@@ -420,22 +417,61 @@ impl Context {
 #[derive(Debug, Clone)]
 pub enum Binding {
     Name,
-    Variable(Rc<Ty>),
+    Variable(TypeId),
 }
+
+pub struct TyContext {
+    types: Vec<Ty>,
+    common: CommonTypes,
+}
+
+impl TyContext {
+    pub fn new() -> Self {
+        let common = CommonTypes { boolean: 0, nat: 1 };
+        let types = vec![Ty::Bool, Ty::Nat];
+        Self { types, common }
+    }
+
+    pub fn new_arrow(&mut self, from: TypeId, to: TypeId) -> TypeId {
+        let i = self.types.len();
+        self.types.push(Ty::Arrow { from, to });
+        i
+    }
+
+    pub fn get(&self, id: TypeId) -> &Ty {
+        &self.types[id]
+    }
+
+    pub fn print(&self, id: TypeId) {
+        self.get(id).print(self);
+        println!()
+    }
+}
+
+pub struct CommonTypes {
+    boolean: TypeId,
+    nat: TypeId,
+}
+
+type TypeId = usize;
 
 #[derive(Clone, PartialEq)]
 pub enum Ty {
     Bool,
     Nat,
-    Arrow { from: Rc<Ty>, to: Rc<Ty> },
+    Arrow { from: TypeId, to: TypeId },
 }
 
-impl fmt::Debug for Ty {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl Ty {
+    fn print(&self, ctx: &TyContext) {
         match self {
-            Ty::Bool => f.write_str("Bool"),
-            Ty::Nat => f.write_str("Nat"),
-            Ty::Arrow { from, to } => write!(f, "{:?} -> {:?}", from, to),
+            Ty::Bool => print!("Bool"),
+            Ty::Nat => print!("Nat"),
+            &Ty::Arrow { from, to } => {
+                ctx.get(from).print(ctx);
+                print!(" -> ");
+                ctx.get(to).print(ctx);
+            }
         }
     }
 }
