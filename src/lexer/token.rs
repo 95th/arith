@@ -11,7 +11,6 @@ pub struct Token {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TokenKind {
     // Keywords
-    Lambda,
     True,
     False,
     If,
@@ -41,6 +40,7 @@ pub enum TokenKind {
     Gt,
     Lt,
     Eq,
+    Pipe,
 
     Eof,
 }

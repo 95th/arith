@@ -11,7 +11,6 @@ use TokenKind::*;
 lazy_static! {
     static ref KEYWORDS: HashMap<Symbol, TokenKind> = {
         let mut map = HashMap::new();
-        map.insert(Symbol::intern("lambda"), TokenKind::Lambda);
         map.insert(Symbol::intern("true"), TokenKind::True);
         map.insert(Symbol::intern("false"), TokenKind::False);
         map.insert(Symbol::intern("if"), TokenKind::If);
@@ -60,6 +59,7 @@ impl Lexer {
                 b'=' => Eq,
                 b'>' => Gt,
                 b'<' => Lt,
+                b'|' => Pipe,
                 b'\n' => {
                     self.line += 1;
                     continue;

@@ -421,8 +421,8 @@ pub enum Binding {
 }
 
 pub struct TyContext {
-    types: Vec<Ty>,
-    common: CommonTypes,
+    pub types: Vec<Ty>,
+    pub common: CommonTypes,
 }
 
 impl TyContext {
@@ -457,8 +457,8 @@ impl TyContext {
 }
 
 pub struct CommonTypes {
-    boolean: TypeId,
-    nat: TypeId,
+    pub boolean: TypeId,
+    pub nat: TypeId,
 }
 
 type TypeId = usize;

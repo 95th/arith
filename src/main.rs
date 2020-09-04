@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 fn main() {
     let s = r#"
-        lambda a: bool -> lambda a: nat -> lambda a: nat -> iszero 0
+        |x: Bool| x
     "#;
 
     let src = Rc::new(s.to_owned());

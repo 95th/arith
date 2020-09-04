@@ -28,7 +28,7 @@ impl Parser {
         }
     }
 
-    pub fn parse_expr(&mut self, tyctx: &mut TyContext) -> Term {
+    pub fn parse_expr(&mut self, tcx: &mut TyContext) -> Term {
         if self.eat(True) {
             Term {
                 kind: TermKind::True,
@@ -46,34 +46,34 @@ impl Parser {
             }
         } else if self.eat(Succ) {
             let lo = self.prev.span;
-            let term = self.parse_expr(tyctx);
+            let term = self.parse_expr(tcx);
             Term {
                 kind: TermKind::Succ(Rc::new(term)),
                 span: lo.to(self.prev.span),
             }
         } else if self.eat(Pred) {
             let lo = self.prev.span;
-            let term = self.parse_expr(tyctx);
+            let term = self.parse_expr(tcx);
             Term {
                 kind: TermKind::Pred(Rc::new(term)),
                 span: lo.to(self.prev.span),
             }
         } else if self.eat(IsZero) {
             let lo = self.prev.span;
-            let term = self.parse_expr(tyctx);
+            let term = self.parse_expr(tcx);
             Term {
                 kind: TermKind::IsZero(Rc::new(term)),
                 span: lo.to(self.prev.span),
             }
         } else if self.eat(If) {
             let lo = self.prev.span;
-            let cond = self.parse_expr(tyctx);
+            let cond = self.parse_expr(tcx);
             self.consume(OpenBrace, "Expected '{' after If condition");
-            let yes = self.parse_expr(tyctx);
+            let yes = self.parse_expr(tcx);
             self.consume(CloseBrace, "Expected '}'");
             self.consume(Else, "Expected 'else'");
             self.consume(OpenBrace, "Expected '{' after else");
-            let no = self.parse_expr(tyctx);
+            let no = self.parse_expr(tcx);
             self.consume(CloseBrace, "Expected '}'");
 
             let span = lo.to(self.prev.span);
@@ -85,25 +85,29 @@ impl Parser {
                 },
                 span,
             }
-        } else if self.eat(Lambda) {
+        } else if self.eat(Pipe) {
             let lo = self.prev.span;
-            self.consume(Ident, "Expected lambda argument name");
+            self.consume(Ident, "Expected an indentifier for Lambda parameter");
             let name = self.prev.symbol;
-
-            self.consume(Colon, "Expected ':' after lambda argument");
-            self.consume(Ident, "Expected lambda argument type");
+            self.consume(Colon, "Expected ':' after lambda parameter");
+            self.consume(Ident, "Expected type after lambda parameter");
             let ty_symbol = self.prev.symbol;
 
-            self.consume(Minus, "Expected '->'");
-            self.consume(Gt, "Expected '->'");
-            let term = self.parse_expr(tyctx);
+            let ty = ty_symbol.as_str_with(|s| match s {
+                "Bool" => tcx.common.boolean,
+                "Nat" => tcx.common.nat,
+                x => quit!(&self.src, self.prev.span, "Unknown type: {}", x),
+            });
+
+            self.consume(Pipe, "Expected '|' after Lambda parameter");
+            let body = self.parse_expr(tcx);
 
             let span = lo.to(self.prev.span);
             Term {
                 kind: TermKind::Fun {
                     name,
-                    ty: tyctx.new_ty(ty_symbol),
-                    term: Rc::new(term),
+                    ty,
+                    term: Rc::new(body),
                 },
                 span,
             }
