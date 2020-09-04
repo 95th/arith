@@ -263,9 +263,9 @@ impl Eval {
             }
             Fun { name, term, .. } => {
                 let x1 = ctx.pick_fresh_name(*name);
-                buf.push_str("(lambda ");
+                buf.push_str("(|");
                 x1.as_str_with(|s| buf.push_str(s));
-                buf.push_str(". ");
+                buf.push_str("| ");
                 self.print(term, ctx, buf);
                 buf.push(')');
             }
@@ -305,7 +305,7 @@ impl Eval {
                         quit!(
                             &self.src,
                             term.span,
-                            "Arms of Conditionals have different types"
+                            "Arms of Conditionals have different types",
                         );
                     }
                 } else {
@@ -476,8 +476,9 @@ impl Ty {
             Ty::Bool => print!("Bool"),
             Ty::Nat => print!("Nat"),
             &Ty::Arrow { from, to } => {
+                print!("|");
                 ctx.get(from).print(ctx);
-                print!(" -> ");
+                print!("| ");
                 ctx.get(to).print(ctx);
             }
         }

@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 fn main() {
     let s = r#"
-        |x: Bool| x
+        if true { |x: Bool| true } else { |y: Bool| false }
     "#;
 
     let src = Rc::new(s.to_owned());
